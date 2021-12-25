@@ -1,7 +1,13 @@
 //! 状态机，用于文法分析
 //!
 
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, rc::Rc};
+
+use crate::tokens::{
+    BoxEnd, BoxMid, ChangeLine, DoubleStar, Idented, ImgStart, LinkStart, NewParam, OrderList,
+    Reference, SepChar, SepLine, Star, Title1, Title2, Title3, Title4, Title5, Title6, TribleStar,
+    UnorderList,
+};
 
 #[derive(Default, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub struct Status(usize);
@@ -43,7 +49,7 @@ pub trait TokenTrait {
 pub enum NextStatus {
     GoOn(Status),
     Final(Rc<dyn TokenTrait>, Status, InputChar),
-    Plain(Vec<InputChar>, Status, InputChar),
+    Plain(Vec<char>, Status, InputChar),
 }
 
 pub struct DFA {
@@ -58,7 +64,7 @@ pub struct DFA {
     final_status: HashMap<Status, Rc<dyn TokenTrait>>,
     //input buffer
     //如果读取到行末却没有对应终结状态，就将buffer内打包为普通文本处理
-    buff: Vec<InputChar>,
+    buff: Vec<char>,
 }
 
 impl DFA {
@@ -75,7 +81,9 @@ impl DFA {
     pub fn next_status(&mut self, status: Status, input: InputChar) -> NextStatus {
         // 自动机可以继续转换下去，继续转换
         if let Some(ns) = self.table.get(&(input, status)) {
-            self.buff.push(input);
+            if let InputChar::Char(c) = input {
+                self.buff.push(c);
+            }
             NextStatus::GoOn(*ns)
         }
         // 自动机无法继续转换下去，但是处于终结状态, 返回终结token并且返回下一状态和input
@@ -97,12 +105,17 @@ impl DFA {
     }
 
     fn reset_status(&self) -> Status {
-        if let Some(last) = self.buff.last() {
-            if last == &InputChar::Char('\n') {
-                return self.line_start.clone();
-            }
+        let mut idx = self.buff.len() - 1;
+        while unsafe { self.buff.get_unchecked(idx) }.is_whitespace()
+            && unsafe { self.buff.get_unchecked(idx) } != &'\n'
+        {
+            idx -= 1;
         }
-        return self.init_status.clone();
+        if unsafe { self.buff.get_unchecked(idx) } == &'\n' {
+            self.line_start
+        } else {
+            self.init_status.clone()
+        }
     }
 
     pub fn init(&self) -> Status {
@@ -172,6 +185,106 @@ impl DFABuilder {
     pub fn build(self) -> DFA {
         self.inner
     }
+
+    pub fn init() -> DFA {
+        Self::new(0, 1)
+            .add_trans(|t, f| {
+                // title
+                let c = '#';
+                t.insert((c, 1), 2);
+                f.insert(2, Rc::new(Title1));
+                t.insert((c, 2), 3);
+                f.insert(3, Rc::new(Title2));
+                t.insert((c, 3), 4);
+                f.insert(4, Rc::new(Title3));
+                t.insert((c, 4), 5);
+                f.insert(5, Rc::new(Title4));
+                t.insert((c, 5), 6);
+                f.insert(6, Rc::new(Title5));
+                t.insert((c, 6), 7);
+                f.insert(7, Rc::new(Title6));
+                //refer
+                t.insert(('>', 1), 8);
+                t.insert(('>', 8), 8);
+                f.insert(8, Rc::new(Reference));
+                //link start
+                t.insert(('[', 0), 9);
+                f.insert(9, Rc::new(LinkStart));
+                //image start
+                t.insert(('!', 0), 10);
+                t.insert(('[', 10), 11);
+                f.insert(11, Rc::new(ImgStart));
+                //box mid
+                t.insert((']', 0), 12);
+                t.insert(('(', 12), 13);
+                f.insert(13, Rc::new(BoxMid));
+                // box mid
+                t.insert((')', 0), 14);
+                f.insert(14, Rc::new(BoxEnd));
+                // unorder list
+                t.insert(('-', 1), 15);
+                f.insert(15, Rc::new(UnorderList));
+                t.insert(('*', 1), 16);
+                f.insert(16, Rc::new(UnorderList));
+                // order list
+                t.insert(('0', 1), 17);
+                t.insert(('0', 17), 17);
+                t.insert(('1', 1), 17);
+                t.insert(('1', 17), 17);
+                t.insert(('2', 1), 17);
+                t.insert(('2', 17), 17);
+                t.insert(('3', 1), 17);
+                t.insert(('3', 17), 17);
+                t.insert(('4', 1), 17);
+                t.insert(('4', 17), 17);
+                t.insert(('5', 1), 17);
+                t.insert(('5', 17), 17);
+                t.insert(('6', 1), 17);
+                t.insert(('6', 17), 17);
+                t.insert(('7', 1), 17);
+                t.insert(('7', 17), 17);
+                t.insert(('8', 1), 17);
+                t.insert(('8', 17), 17);
+                t.insert(('9', 1), 17);
+                t.insert(('9', 17), 17);
+                t.insert(('.', 17), 18);
+                f.insert(18, Rc::new(OrderList));
+                // sep line
+                t.insert(('-', 15), 19);
+                t.insert(('-', 19), 20);
+                f.insert(20, Rc::new(SepLine));
+                t.insert(('*', 16), 21);
+                t.insert(('*', 21), 22);
+                f.insert(22, Rc::new(SepLine));
+                //star
+                t.insert(('*', 0), 23);
+                f.insert(23, Rc::new(Star));
+                t.insert(('*', 23), 24);
+                f.insert(23, Rc::new(DoubleStar));
+                t.insert(('*', 24), 25);
+                f.insert(23, Rc::new(TribleStar));
+
+                //specal type
+                //sep
+                t.insert((' ', 0), 24);
+                f.insert(24, Rc::new(SepChar));
+                // line change
+                t.insert(('\n', 0), 25);
+                f.insert(25, Rc::new(ChangeLine));
+                // parghe change
+                t.insert((' ', 24), 26);
+                t.insert(('\n', 26), 27);
+                f.insert(27, Rc::new(NewParam));
+                //idented
+                t.insert((' ', 1), 28);
+                t.insert((' ', 28), 29);
+                t.insert((' ', 29), 30);
+                t.insert((' ', 30), 31);
+                t.insert(('\t', 1), 31);
+                f.insert(31, Rc::new(Idented));
+            })
+            .build()
+    }
 }
 
 #[cfg(test)]
@@ -179,6 +292,7 @@ mod test {
 
     use super::*;
 
+    #[derive(Debug)]
     struct Indented;
     impl TokenTrait for Indented {
         fn name(&self) -> &'static str {

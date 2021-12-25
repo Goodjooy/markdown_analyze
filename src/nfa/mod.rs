@@ -1,7 +1,9 @@
 use std::{
-    collections::{HashMap, HashSet},
-    ops::{BitAnd, BitOr},
+    collections::{HashMap, HashSet, LinkedList},
+    ops::{BitAnd, BitOr}, rc::Rc,
 };
+
+use crate::{dfa::{DFA, DFABuilder, TokenTrait}, utils::counter::Counter};
 
 mod and_nfa;
 mod or_nfa;
@@ -13,6 +15,7 @@ pub struct MacroNfa {
     input_set: HashSet<char>,
     start: usize,
     final_status: usize,
+
 }
 
 impl MacroNfa {
@@ -140,6 +143,112 @@ impl BitOr for MacroNfa {
         self.final_status = counter;
 
         Self { ..self }
+    }
+}
+
+impl MacroNfa {
+    fn extand_set(&self, tgt: &mut HashSet<usize>) {
+        let mut queue = LinkedList::<usize>::new();
+        for s in tgt.iter() {
+            queue.push_back(*s);
+        }
+        queue.push_back(self.start);
+        while let Some(ne) = queue.pop_front() {
+            tgt.insert(ne);
+            if let Some(f) = self.none_trans_table.get(&ne) {
+                for v in f {
+                    queue.push_back(*v)
+                }
+            }
+        }
+    }
+}
+// dfa 状态
+#[derive(Eq)]
+struct DState {
+    nfas: Vec<usize>,
+}
+
+impl PartialEq for DState {
+    fn eq(&self, other: &Self) -> bool {
+        self.nfas == other.nfas
+    }
+}
+
+impl DState {
+    fn new(set: &HashSet<usize>) -> Self {
+        Self {
+            nfas: set.iter().map(|v| *v).collect(),
+        }
+    }
+}
+
+impl std::hash::Hash for DState {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.nfas.hash(state);
+    }
+}
+
+impl Into<DFA> for MacroNfa {
+    fn into(self) -> DFA {
+        // 全部DFA状态
+        let mut d_states = HashMap::<DState, usize>::new();
+        // 未标记的状态
+        let mut d_unsigned_states = LinkedList::<HashSet<usize>>::new();
+        let mut d_trans = HashMap::<(usize, char), usize>::new();
+        let mut counter = Counter::new();
+        // from start status
+        // collect all reachable status by input nil
+        let mut status = HashSet::<usize>::from_iter([self.start]);
+        let mut queue = LinkedList::<usize>::new();
+        self.extand_set(&mut status);
+        // 添加初始状态
+
+        let start_id = counter.next().unwrap();
+        let mut final_id = Option::<usize>::None;
+
+        d_states.insert(DState::new(&status), start_id);
+        d_unsigned_states.push_back(status);
+
+        while let Some(state) = d_unsigned_states.pop_front() {
+            let src_state = DState::new(&state);
+            // 对于每个未标记的状态，必定是一个DFA 状态
+            let src_id = *d_states.get(&src_state).unwrap();
+
+            //循环输入符号表，
+            for sign in self.input_set.iter() {
+                let mut res = state
+                    .iter()
+                    .map(|v| *v)
+                    .filter_map(|v| self.trans_table.get(&(v, *sign)))
+                    .map(|f| *f)
+                    .collect::<HashSet<_>>();
+                self.extand_set(&mut res);
+
+                let status = DState::new(&res);
+                let set_final = res.contains(&self.final_status);
+
+                let id = if let Some(i) = d_states.get(&status) {
+                    *i
+                } else {
+                    // un regeisted status
+                    let id = counter.next().unwrap();
+                    d_states.insert(status, id);
+                    d_unsigned_states.push_back(res);
+
+                    id
+                };
+                if set_final {
+                    final_id = Some(id);
+                }
+                //add trans
+                d_trans.insert((src_id, *sign), id);
+            }
+        }
+
+      
+        
+        unimplemented!()
     }
 }
 
