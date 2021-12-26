@@ -3,7 +3,7 @@ use std::{
     ops::{BitAnd, BitOr}, rc::Rc,
 };
 
-use crate::{dfa::{DFA, DFABuilder, TokenTrait}, utils::counter::Counter};
+use crate::{ utils::counter::Counter, dfa::core::DFA};
 
 mod and_nfa;
 mod or_nfa;

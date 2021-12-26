@@ -4,7 +4,7 @@ mod tokens;
 mod  interface;
 mod utils;
 
-mod dfa;
+pub mod dfa;
 mod nfa;
 
 #[test]

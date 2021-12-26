@@ -1,10 +1,11 @@
-use std::ops::Add;
-
-pub(crate) struct Counter(usize);
+pub(crate) struct Counter(pub(crate) usize);
 
 impl Counter {
     pub(crate) fn new() -> Counter {
         Self(0)
+    }
+    pub(crate) fn init(init: usize) -> Counter {
+        Self(init)
     }
 }
 

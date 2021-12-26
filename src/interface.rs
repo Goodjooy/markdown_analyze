@@ -6,7 +6,7 @@ pub trait MDMeta:serde::Serialize {
     fn name(&self)->&'static str;
 }
 
-type finalstruct=Vec<Box<dyn MDMeta>>;
+type FinalStruct=Vec<Box<dyn MDMeta>>;
 
 
 pub enum LoadResult<T> {
