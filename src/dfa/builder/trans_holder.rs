@@ -31,24 +31,25 @@ impl TransHolder {
 }
 
 impl TransHolder {
-    pub fn add_normal_tran(&mut self, src: usize, input: char, dst: usize) -> usize {
-        self.trans.insert((src, input.into()), dst);
-        dst
+    pub fn add_tran<T>(&mut self, src: usize, input: T, dst: usize) -> usize
+    where
+        T: Into<InputChar> + Clone,
+    {
+        // if trans exist ,do not change
+        if let Some(dst) = self.trans.get(&(src, input.clone().into())) {
+            *dst
+        } else {
+            self.trans.insert((src, input.into()), dst);
+            dst
+        }
     }
 
-    pub fn add_normal_tran_with_auto_next(&mut self, src: usize, input: char) -> usize {
+    pub fn add_tran_with_auto_next<T>(&mut self, src: usize, input: T) -> usize
+    where
+        T: Into<InputChar> + Clone,
+    {
         let next = self.counter.next().unwrap();
-        self.add_normal_tran(src, input, next)
-    }
-
-    pub fn add_any_tran(&mut self, src: usize, input: AnyType, dst: usize) -> usize {
-        self.trans.insert((src, input.into()), dst);
-        dst
-    }
-
-    pub fn add_any_tran_with_auto_next(&mut self, src: usize, input: AnyType) -> usize {
-        let dst = self.counter.next().unwrap();
-        self.add_any_tran(src, input, dst)
+        self.add_tran(src, input, next)
     }
 
     pub fn add_can_any(&mut self, src: usize, any_tran: Box<dyn CanAny>) {

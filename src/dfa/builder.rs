@@ -1,24 +1,15 @@
-use std::{
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
-
-use serde::de::IntoDeserializer;
-
-use crate::tokens::Title1;
+use crate::tokens::{Title1, TripleStar};
 
 use self::trans_holder::TransHolder;
 
 use super::{
     core::DFA,
-    interface::{CanAny, TokenTrait},
     utils::AdHocCanAny,
     wraps::{AnyType, InputChar, Status},
 };
 use crate::tokens::{
     BoxEnd, BoxMid, ChangeLine, DoubleStar, Idented, ImgStart, LinkStart, NewParam, OrderList,
-    Reference, SepChar, SepLine, Star, Title2, Title3, Title4, Title5, Title6, TribleStar,
-    UnorderList,
+    Reference, SepChar, SepLine, Star, Title2, Title3, Title4, Title5, Title6, UnorderList,
 };
 
 mod trans_holder;
@@ -67,7 +58,7 @@ impl DFABuilder {
     where
         F: FnOnce(&mut TransHolder),
     {
-        let mut holder = TransHolder::new(self.init_count);
+        let mut holder = TransHolder::new(self.init_count+1);
 
         handle(&mut holder);
 
@@ -106,47 +97,49 @@ impl DFABuilder {
                 // title
                 let c = '#';
                 //#
-                let mut next = h.add_normal_tran_with_auto_next(1, c);
+                let mut next = h.add_tran_with_auto_next(1, c);
                 h.set_accept_status(next, Title1);
                 //##
-                next = h.add_normal_tran_with_auto_next(next, c);
+                next = h.add_tran_with_auto_next(next, c);
                 h.set_accept_status(next, Title2);
                 //###
-                next = h.add_normal_tran_with_auto_next(next, c);
+                next = h.add_tran_with_auto_next(next, c);
                 h.set_accept_status(next, Title3);
                 //####
-                next = h.add_normal_tran_with_auto_next(next, c);
+                next = h.add_tran_with_auto_next(next, c);
                 h.set_accept_status(next, Title4);
                 //#####
-                next = h.add_normal_tran_with_auto_next(next, c);
+                next = h.add_tran_with_auto_next(next, c);
                 h.set_accept_status(next, Title5);
                 //######
-                next = h.add_normal_tran_with_auto_next(next, c);
+                next = h.add_tran_with_auto_next(next, c);
                 h.set_accept_status(next, Title6);
-                // //refer
-                // t.insert(('>'.into(), 1), 8);
-                // t.insert(('>'.into(), 8), 8);
-                // f.insert(8, Rc::new(Reference));
-                // //link start
-                // t.insert(('['.into(), 0), 9);
-                // f.insert(9, Rc::new(LinkStart));
-                // //image start
-                // t.insert(('!'.into(), 0), 10);
-                // t.insert(('['.into(), 10), 11);
-                // f.insert(11, Rc::new(ImgStart));
-                // //box mid
-                // t.insert((']'.into(), 0), 12);
-                // t.insert(('('.into(), 12), 13);
-                // f.insert(13, Rc::new(BoxMid));
-                // // box mid
-                // t.insert((')'.into(), 0), 14);
-                // f.insert(14, Rc::new(BoxEnd));
-                // // unorder list
-                // t.insert(('-'.into(), 1), 15);
-                // f.insert(15, Rc::new(UnorderList));
-                // t.insert(('*'.into(), 1), 16);
-                // f.insert(16, Rc::new(UnorderList));
-                // // order list
+                //refer
+                next = h.add_tran_with_auto_next(1, '>');
+                next = h.add_tran(next, '>', next);
+                h.set_accept_status(next, Reference);
+                //link start
+                next = h.add_tran_with_auto_next(0, '[');
+                h.set_accept_status(next, LinkStart);
+                //image start
+                next = h.add_tran_with_auto_next(0, '!');
+                next = h.add_tran_with_auto_next(next, '[');
+                h.set_accept_status(next, ImgStart);
+                //box mid
+                next = h.add_tran_with_auto_next(0, ']');
+                next = h.add_tran_with_auto_next(next, '(');
+                h.set_accept_status(next, BoxMid);
+                // box end
+                next = h.add_tran_with_auto_next(0, ')');
+                h.set_accept_status(next, BoxEnd);
+                // unorder list
+                next = h.add_tran_with_auto_next(1, '-');
+                let m1 = next;
+                next = h.add_tran_with_auto_next(1, '*');
+                let m2 = next;
+                h.set_accept_status(m1, UnorderList);
+                h.set_accept_status(m2, UnorderList);
+                // order list
                 h.add_can_any(
                     next,
                     AdHocCanAny::new(|c| match c.is_digit(10) {
@@ -154,65 +147,45 @@ impl DFABuilder {
                         false => None,
                     }),
                 );
-                next = h.add_any_tran_with_auto_next(next, AnyType::Digit);
-                next = h.add_normal_tran_with_auto_next(next, '.');
-                // t.insert(('0'.into(), 1), 17);
-                // t.insert(('0'.into(), 17), 17);
-                // t.insert(('1'.into(), 1), 17);
-                // t.insert(('1'.into(), 17), 17);
-                // t.insert(('2'.into(), 1), 17);
-                // t.insert(('2'.into(), 17), 17);
-                // t.insert(('3'.into(), 1), 17);
-                // t.insert(('3'.into(), 17), 17);
-                // t.insert(('4'.into(), 1), 17);
-                // t.insert(('4'.into(), 17), 17);
-                // t.insert(('5'.into(), 1), 17);
-                // t.insert(('5'.into(), 17), 17);
-                // t.insert(('6'.into(), 1), 17);
-                // t.insert(('6'.into(), 17), 17);
-                // t.insert(('7'.into(), 1), 17);
-                // t.insert(('7'.into(), 17), 17);
-                // t.insert(('8'.into(), 1), 17);
-                // t.insert(('8'.into(), 17), 17);
-                // t.insert(('9'.into(), 1), 17);
-                // t.insert(('9'.into(), 17), 17);
-                // t.insert(('.'.into(), 17), 18);
-                // f.insert(18, Rc::new(OrderList));
-                // // sep line
-                // t.insert(('-'.into(), 15), 19);
-                // t.insert(('-'.into(), 19), 20);
-                // f.insert(20, Rc::new(SepLine));
-                // t.insert(('*'.into(), 16), 21);
-                // t.insert(('*'.into(), 21), 22);
-                // f.insert(22, Rc::new(SepLine));
-                // //star
-                // t.insert(('*'.into(), 0), 23);
-                // f.insert(23, Rc::new(Star));
-                // t.insert(('*'.into(), 23), 24);
-                // f.insert(23, Rc::new(DoubleStar));
-                // t.insert(('*'.into(), 24), 25);
-                // f.insert(23, Rc::new(TribleStar));
+                next = h.add_tran_with_auto_next(next, AnyType::Digit);
+                next = h.add_tran_with_auto_next(next, '.');
+                h.set_accept_status(next, OrderList);
+                // sep line
+                next = h.add_tran_with_auto_next(1, '-');
+                next = h.add_tran_with_auto_next(next, '-');
+                next = h.add_tran_with_auto_next(next, '-');
+                h.set_accept_status(next, SepLine);
+                next = h.add_tran_with_auto_next(1, '*');
+                next = h.add_tran_with_auto_next(next, '*');
+                next = h.add_tran_with_auto_next(next, '*');
+                h.set_accept_status(next, SepLine);
+                //star
+                next = h.add_tran_with_auto_next(0, '*');
+                h.set_accept_status(next, Star);
+                next = h.add_tran_with_auto_next(next, '*');
+                h.set_accept_status(next, DoubleStar);
+                next = h.add_tran_with_auto_next(next, '*');
+                h.set_accept_status(next, TripleStar);
 
-                // //specal type
-                // //sep
-                // t.insert((' '.into(), 0), 24);
-                // f.insert(24, Rc::new(SepChar));
+                //specal type
+                //sep
+                next = h.add_tran_with_auto_next(0, ' ');
+                h.set_accept_status(next, SepChar);
                 // // line change
-                // t.insert(('\n'.into(), 0), 25);
-                // f.insert(25, Rc::new(ChangeLine));
+                next = h.add_tran_with_auto_next(0, '\n');
+                h.set_accept_status(next, ChangeLine);
                 // // parghe change
-                // t.insert((' '.into(), 24), 26);
-                // t.insert(('\n'.into(), 26), 27);
-                // f.insert(27, Rc::new(NewParam));
+                next = h.add_tran_with_auto_next(0, ' ');
+                next = h.add_tran_with_auto_next(next, ' ');
+                next = h.add_tran_with_auto_next(next, '\n');
+                h.set_accept_status(next, NewParam);
                 // //idented
-                // t.insert((' '.into(), 1), 28);
-                // t.insert((' '.into(), 28), 29);
-                // t.insert((' '.into(), 29), 30);
-                // t.insert((' '.into(), 30), 31);
-                // t.insert(('\t'.into(), 1), 31);
-                // f.insert(31, Rc::new(Idented));
-
-                // t.insert((InputChar::Any(AnyType::Digit), 31), 32);
+                next = h.add_tran_with_auto_next(1, ' ');
+                next = h.add_tran_with_auto_next(next, ' ');
+                next = h.add_tran_with_auto_next(next, ' ');
+                next = h.add_tran_with_auto_next(next, ' ');
+                next = h.add_tran(1, '\t', next);
+                h.set_accept_status(next, Idented);
             })
             .build()
     }
@@ -222,7 +195,7 @@ impl DFABuilder {
 mod test {
 
     use crate::dfa::{
-        interface::FullToken,
+        interface::{FullToken, TokenTrait},
         wraps::{NextStatus, Status},
     };
 
@@ -244,15 +217,14 @@ mod test {
 
     #[test]
     fn test_builder() {
-        let i: Rc<dyn TokenTrait> = Rc::new(Indented);
         let mut dfa = DFABuilder::new(0, 1)
             .add_trans(|h| {
                 let i = ' ';
-                let mut next = h.add_normal_tran_with_auto_next(1, i);
-                next = h.add_normal_tran_with_auto_next(next, i);
-                next = h.add_normal_tran_with_auto_next(next, i);
-                next = h.add_normal_tran_with_auto_next(next, i);
-                next = h.add_normal_tran(1, '\t', next);
+                let mut next = h.add_tran_with_auto_next(1, i);
+                next = h.add_tran_with_auto_next(next, i);
+                next = h.add_tran_with_auto_next(next, i);
+                next = h.add_tran_with_auto_next(next, i);
+                next = h.add_tran(1, '\t', next);
 
                 h.set_accept_status(next, Indented)
             })
@@ -260,9 +232,9 @@ mod test {
         let mut init = dfa.init();
         let mut last = None;
 
-        println!("{:?}", &init);
+        println!("init {:?}", &init);
 
-        let mut iter = vec![' ', ' ', ' ', ' ', 'a'].into_iter();
+        let mut iter = vec!['\t', ' ', ' ', ' ', 'a'].into_iter();
         loop {
             let input = if let Some(c) = last {
                 last = None;
@@ -273,16 +245,15 @@ mod test {
                 break;
             };
 
-            println!("{:?}", &input);
+            println!(" input {:?}", &input);
             match dfa.next_status(init, input.into()) {
                 NextStatus::GoOn(go) => {
-                    println!("{:?}", &go);
+                    println!("next {:?}", &go);
                     init = go;
                 }
                 NextStatus::Final(r, ns, i) => {
-                    //assert_eq!("Idented", r.name());
-                    assert_eq!(i, InputChar::Char('a'));
-                    assert_eq!(ns, Status(0));
+                    assert_eq!(i, InputChar::Char(' '));
+                    assert_eq!(ns, Status(1));
                     assert_eq!(init, Status(5));
                     if let InputChar::Char(c) = i {
                         last = Some(c);
@@ -293,7 +264,7 @@ mod test {
                 NextStatus::Plain(p, s, i) => {
                     assert_eq!(input, 'a');
 
-                    assert_eq!(p, vec![]);
+                    assert_eq!(p, vec![' ', ' ', ' ']);
                     assert_eq!(s, Status(0));
                     assert_eq!(i, InputChar::Char('a'));
                 }
@@ -308,5 +279,12 @@ mod test {
         } else {
             unreachable!()
         }
+    }
+
+    #[test]
+    fn test_full_dfa() {
+        let dfa=DFABuilder::init();
+
+        print!("{}",dfa);
     }
 }

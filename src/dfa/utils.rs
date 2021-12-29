@@ -24,14 +24,3 @@ where
         handle(input)
     }
 }
-
-#[test]
-fn test_adhoc() {
-    let adh = AdHocCanAny::new(|c| {
-        if c.is_digit(10) {
-            Some(AnyType::Digit)
-        } else {
-            None
-        }
-    });
-}

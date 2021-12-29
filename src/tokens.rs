@@ -6,12 +6,6 @@ macro_rules! token_generator {
         #[derive(Clone)]
         pub struct $ty;
 
-        impl $ty {
-            pub fn new() -> Box<dyn TokenTrait> {
-                Box::new($ty)
-            }
-        }
-
         impl FullToken for $ty{
         }
 
@@ -55,7 +49,7 @@ token_generator![
     "SeperLine": SepLine,        // ---
     "star": Star,                // *
     "d_star": DoubleStar,        //**
-    "t_star": TribleStar         // ***
+    "t_star": TripleStar         // ***
 ];
 
 pub struct FullTrans(char);

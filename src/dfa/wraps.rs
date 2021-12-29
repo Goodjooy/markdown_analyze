@@ -1,10 +1,9 @@
+use std::ops::BitOr;
+
 use super::interface::FullToken;
 
 #[derive(Default, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub struct Status(pub(super) usize);
-
-
-
 
 impl From<usize> for Status {
     fn from(i: usize) -> Self {
@@ -13,15 +12,39 @@ impl From<usize> for Status {
 }
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum AnyType {
+    // any char
+    Any,
+    // digit char
     Digit,
-    WideSpace,
-
+    // 字母表
+    Alphabet,
+    // 小写
+    LowerCase,
+    // 大写
+    UpperCase,
+    // 空白
+    WhiteSpace,
+    // 是个数字
+    Numer,
+    // 是否为ASCII编码
+    Ascii,
+    // 其他类型（要提供标记id）
+    Orther(usize),
+    // 混合
     Conbin(Box<AnyType>, Box<AnyType>),
 }
 
 impl Into<InputChar> for AnyType {
     fn into(self) -> InputChar {
         InputChar::Any(self)
+    }
+}
+
+impl BitOr for AnyType {
+    type Output = AnyType;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        AnyType::Conbin(Box::new(self), Box::new(rhs))
     }
 }
 
@@ -58,7 +81,24 @@ impl From<char> for InputChar {
 }
 
 pub enum NextStatus {
+    /// goon 状态机还能进行下一步转换，继续转换，携带下一状态
     GoOn(Status),
-    Final(Box<dyn FullToken>, Status, InputChar),
-    Plain(Vec<char>, Status, InputChar),
+    /// accept 状态机无法继续转换，且处于接受状态，返回接受对应的Token
+    Final(
+        /// 接受状态对应的token
+        Box<dyn FullToken>,
+        /// 自动机重启后的开始状态
+        Status,
+        /// 自动机重启后的第一个输入
+        InputChar,
+    ),
+    // raw input 缓冲区数据，当自动机无法继续转换下去且不处于接受状态，返回Buff数据
+    Plain(
+        // 对应的buff数据
+        Vec<char>,
+        // 重启自动机后的开始状态
+        Status,
+        // 重启后第一次输入的字符
+        InputChar,
+    ),
 }
