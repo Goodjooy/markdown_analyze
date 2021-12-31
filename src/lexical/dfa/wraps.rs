@@ -1,6 +1,6 @@
 use std::ops::BitOr;
 
-use super::interface::FullToken;
+use super::super::token_trait::FullToken;
 
 #[derive(Default, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub struct Status(pub(super) usize);
@@ -87,6 +87,8 @@ pub enum NextStatus {
     Final(
         /// 接受状态对应的token
         Box<dyn FullToken>,
+        //原始数据
+        Vec<char>,
         /// 自动机重启后的开始状态
         Status,
         /// 自动机重启后的第一个输入
@@ -102,3 +104,6 @@ pub enum NextStatus {
         InputChar,
     ),
 }
+
+
+

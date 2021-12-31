@@ -1,15 +1,19 @@
-use crate::tokens::{Title1, TripleStar};
-
-use self::trans_holder::TransHolder;
-
 use super::{
+    super::tokens::{
+        code_snippet::PartCodeSnippet,
+        titles::{Title1, Title2, Title3, Title4, Title5, Title6},
+        Trans,
+    },
     core::DFA,
     utils::AdHocCanAny,
     wraps::{AnyType, InputChar, Status},
 };
-use crate::tokens::{
-    BoxEnd, BoxMid, ChangeLine, DoubleStar, Idented, ImgStart, LinkStart, NewParam, OrderList,
-    Reference, SepChar, SepLine, Star, Title2, Title3, Title4, Title5, Title6, UnorderList,
+
+use self::trans_holder::TransHolder;
+
+use crate::lexical::tokens::{
+    BoxEnd, BoxMid, ChangeLine, Idented, ImgStart, LinkStart, NewParam, OrderList, Reference,
+    SepChar, SepLine, Star, UnorderList,
 };
 
 mod trans_holder;
@@ -58,7 +62,11 @@ impl DFABuilder {
     where
         F: FnOnce(&mut TransHolder),
     {
-        let mut holder = TransHolder::new(self.init_count+1);
+        let mut holder = TransHolder::new(
+            self.init_count + 1,
+            self.inner.line_start.0,
+            self.inner.init_status.0,
+        );
 
         handle(&mut holder);
 
@@ -120,9 +128,11 @@ impl DFABuilder {
                 h.set_accept_status(next, Reference);
                 //link start
                 next = h.add_tran_with_auto_next(0, '[');
+                next = h.add_tran(1, '[', next);
                 h.set_accept_status(next, LinkStart);
                 //image start
                 next = h.add_tran_with_auto_next(0, '!');
+                next = h.add_tran(1, '!', next);
                 next = h.add_tran_with_auto_next(next, '[');
                 h.set_accept_status(next, ImgStart);
                 //box mid
@@ -161,11 +171,8 @@ impl DFABuilder {
                 h.set_accept_status(next, SepLine);
                 //star
                 next = h.add_tran_with_auto_next(0, '*');
+                next = h.add_tran(1, '*', next);
                 h.set_accept_status(next, Star);
-                next = h.add_tran_with_auto_next(next, '*');
-                h.set_accept_status(next, DoubleStar);
-                next = h.add_tran_with_auto_next(next, '*');
-                h.set_accept_status(next, TripleStar);
 
                 //specal type
                 //sep
@@ -186,6 +193,51 @@ impl DFABuilder {
                 next = h.add_tran_with_auto_next(next, ' ');
                 next = h.add_tran(1, '\t', next);
                 h.set_accept_status(next, Idented);
+
+                // 转义符
+                next = h.add_tran_with_auto_next(0, '\\');
+                next = h.add_tran(1, '\\', next);
+                let ts = next;
+                next = h.add_tran_with_auto_next(next, '\\');
+                next = h.add_tran(ts, '#', next);
+                next = h.add_tran(ts, '`', next);
+                next = h.add_tran(ts, '-', next);
+                next = h.add_tran(ts, '-', next);
+                next = h.add_tran(ts, '{', next);
+                next = h.add_tran(ts, '}', next);
+                next = h.add_tran(ts, '[', next);
+                next = h.add_tran(ts, ']', next);
+                next = h.add_tran(ts, '(', next);
+                next = h.add_tran(ts, ')', next);
+                next = h.add_tran(ts, '+', next);
+                next = h.add_tran(ts, '.', next);
+                next = h.add_tran(ts, '!', next);
+                next = h.add_tran(ts, '|', next);
+                h.set_accept_status(next, Trans);
+
+                // 简短代码块
+                // 空白内容
+                next = h.add_tran_with_auto_next(0, '`');
+                let inner_start = next;
+                next = h.add_tran_with_auto_next(next, '`');
+                // 空白代码接受位置
+                h.set_accept_status(next, PartCodeSnippet);
+                // 非空白部分
+                // 内部接受任何非'`'字符
+                h.add_can_any(inner_start, AdHocCanAny::new(|_buff| Some(AnyType::Any)));
+                next = h.add_tran_with_auto_next(inner_start, AnyType::Any);
+                h.add_can_any(next, AdHocCanAny::new(|_| Some(AnyType::Any)));
+                next = h.add_tran(next, AnyType::Any, next);
+                next = h.add_tran_with_auto_next(next, '`');
+                // 简短代码块接受位置
+                h.set_accept_status(next, PartCodeSnippet);
+                // 后续复杂代码块
+                next = h.add_tran_with_auto_next(next, '`');
+                h.add_can_any(next, AdHocCanAny::new(|_| Some(AnyType::Any)));
+                next = h.add_tran(next, AnyType::Any, next);
+                next = h.add_tran_with_auto_next(next, '`');
+                next = h.add_tran_with_auto_next(next, '`');
+                h.set_accept_status(next, PartCodeSnippet);
             })
             .build()
     }
@@ -194,10 +246,9 @@ impl DFABuilder {
 #[cfg(test)]
 mod test {
 
-    use crate::dfa::{
-        interface::{FullToken, TokenTrait},
-        wraps::{NextStatus, Status},
-    };
+    use crate::lexical::{dfa::{
+        wraps::{InputChar, NextStatus},
+    }, token_trait::{FullToken, TokenTrait}};
 
     use super::*;
 
@@ -251,7 +302,7 @@ mod test {
                     println!("next {:?}", &go);
                     init = go;
                 }
-                NextStatus::Final(r, ns, i) => {
+                NextStatus::Final(r, _, ns, i) => {
                     assert_eq!(i, InputChar::Char(' '));
                     assert_eq!(ns, Status(1));
                     assert_eq!(init, Status(5));
@@ -283,8 +334,8 @@ mod test {
 
     #[test]
     fn test_full_dfa() {
-        let dfa=DFABuilder::init();
+        let dfa = DFABuilder::init();
 
-        print!("{}",dfa);
+        print!("{}", dfa);
     }
 }

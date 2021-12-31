@@ -1,12 +1,10 @@
 use std::collections::HashSet;
 
-mod tokens;
 mod  interface;
 mod utils;
 
-pub mod dfa;
-mod nfa;
 
+mod lexical;
 #[test]
 fn test_set() {
     let a =HashSet::<usize>::from_iter(vec![1,2,3,4,5].into_iter());

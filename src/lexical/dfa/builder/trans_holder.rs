@@ -1,27 +1,26 @@
+use super::super::{interface::CanAny, wraps::InputChar};
 use std::{collections::HashMap, usize};
 
-use crate::{
-    dfa::{
-        interface::{CanAny, TokenTrait},
-        wraps::{AnyType, InputChar},
-    },
-    utils::counter::Counter,
-};
+use crate::{lexical::token_trait::TokenTrait, utils::counter::Counter};
 
 pub struct TransHolder {
     pub(super) trans: HashMap<(usize, InputChar), usize>,
     pub(super) any_trans: HashMap<usize, Box<dyn CanAny>>,
     pub(super) ac_status: HashMap<usize, Box<dyn TokenTrait>>,
+    line_start: usize,
+    init_status: usize,
     counter: Counter,
 }
 
 impl TransHolder {
-    pub(super) fn new(init: usize) -> Self {
+    pub(super) fn new(init: usize, line_start: usize, init_status: usize) -> Self {
         Self {
             trans: HashMap::with_capacity(16),
             any_trans: HashMap::with_capacity(16),
             ac_status: HashMap::with_capacity(16),
             counter: Counter::init(init),
+            line_start,
+            init_status,
         }
     }
 

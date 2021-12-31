@@ -1,4 +1,3 @@
-use crate::dfa::interface::{FullToken, TokenTrait};
 
 #[macro_export]
 macro_rules! token_generator {
@@ -26,20 +25,20 @@ macro_rules! token_generator {
     }
 }
 
+pub mod code_snippet;
+pub mod titles;
+pub mod reference;
+
+use crate::lexical::token_trait::TokenTrait;
+use crate::lexical::FullToken;
+pub use reference::PartRef as Reference;
+
 token_generator![
     "sep_char": SepChar,       // ` `
     "change_line": ChangeLine, // \n
     "new_param": NewParam,     // `  \n`
     "idented": Idented,        // `    ` | \t
-    // 标题部分
-    "h1": Title1, //#
-    "h2": Title2, //##
-    "h3": Title3, // ###
-    "h4": Title4, // ####
-    "h5": Title5, // #####
-    "h6": Title6, // ######
     // orthers
-    "refer": Reference,          // >
     "link_start": LinkStart,     // [
     "img_start": ImgStart,       // ![
     "box_mid": BoxMid,           // ](
@@ -47,9 +46,7 @@ token_generator![
     "unorder_list": UnorderList, // -
     "order_list": OrderList,     // 0|1|2|3|4|5|6|7|8|9 .
     "SeperLine": SepLine,        // ---
-    "star": Star,                // *
-    "d_star": DoubleStar,        //**
-    "t_star": TripleStar         // ***
+    "star": Star               // *
 ];
 
 pub struct FullTrans(char);
@@ -65,3 +62,13 @@ impl TokenTrait for Trans {
         Box::new(FullTrans(buff[1]))
     }
 }
+
+pub struct Plain(pub(super) String);
+impl FullToken for Plain {
+    
+}
+
+pub struct  Eof;
+impl FullToken for Eof {
+    
+} 

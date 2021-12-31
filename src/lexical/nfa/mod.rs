@@ -1,9 +1,10 @@
+use crate::lexical::dfa::core::DFA;
 use std::{
     collections::{HashMap, HashSet, LinkedList},
-    ops::{BitAnd, BitOr}, rc::Rc,
+    ops::{BitAnd, BitOr},
 };
 
-use crate::{ utils::counter::Counter, dfa::core::DFA};
+use crate::utils::counter::Counter;
 
 mod and_nfa;
 mod or_nfa;
@@ -15,7 +16,6 @@ pub struct MacroNfa {
     input_set: HashSet<char>,
     start: usize,
     final_status: usize,
-
 }
 
 impl MacroNfa {
@@ -246,8 +246,6 @@ impl Into<DFA> for MacroNfa {
             }
         }
 
-      
-        
         unimplemented!()
     }
 }
