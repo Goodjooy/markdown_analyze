@@ -66,8 +66,6 @@ impl DFABuilder {
     {
         let mut holder = TransHolder::new(
             self.init_count + 1,
-            self.inner.line_start.0,
-            self.inner.init_status.0,
         );
 
         handle(&mut holder);
