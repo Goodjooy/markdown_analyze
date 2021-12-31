@@ -1,4 +1,6 @@
-use super::super::token_trait::{TokenTrait, FullToken};
+use full_token_derive_macro::FullToken;
+
+use super::super::token_trait::{FullToken, TokenTrait};
 
 pub struct PartCodeSnippet;
 
@@ -31,9 +33,70 @@ impl TokenTrait for PartCodeSnippet {
         Box::new(CodeSnippet { inner })
     }
 }
-
+#[derive(FullToken)]
+#[token(name = "code_snippet")]
 pub struct CodeSnippet {
     pub inner: String,
 }
 
-impl FullToken for CodeSnippet {}
+#[cfg(test)]
+mod test {
+    use crate::lexical::token_trait::FromTokenMeta;
+
+    use super::*;
+
+    #[test]
+    fn test_empty() {
+        let buff = "``".chars().collect::<Vec<_>>();
+        let res = PartCodeSnippet.to_full(&buff);
+
+        assert_eq!(
+            "",
+            String::from_token_meta(&res.get_data("inner").unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_not_empty() {
+        let buff = "`ababb`".chars().collect::<Vec<_>>();
+        let res = PartCodeSnippet.to_full(&buff);
+
+        assert_eq!(
+            "ababb",
+            String::from_token_meta(&res.get_data("inner").unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_empty_cmp() {
+        let buff = "``````".chars().collect::<Vec<_>>();
+        let res = PartCodeSnippet.to_full(&buff);
+
+        assert_eq!(
+            "",
+            String::from_token_meta(&res.get_data("inner").unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_not_empty_cmp() {
+        let buff = "```abba```".chars().collect::<Vec<_>>();
+        let res = PartCodeSnippet.to_full(&buff);
+
+        assert_eq!(
+            "abba",
+            String::from_token_meta(&res.get_data("inner").unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_not_empty_cmp_with_inner() {
+        let buff = "```a`bba```".chars().collect::<Vec<_>>();
+        let res = PartCodeSnippet.to_full(&buff);
+
+        assert_eq!(
+            "a`bba",
+            String::from_token_meta(&res.get_data("inner").unwrap()).unwrap()
+        );
+    }
+}

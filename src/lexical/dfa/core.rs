@@ -4,7 +4,7 @@ use crate::lexical::token_trait::TokenTrait;
 
 use super::{
     interface::{CanAny},
-    wraps::{InputChar, NextStatus, Status},
+    wraps::{InputChar, NextStatus, Status, LineStatus},
 };
 
 pub struct DFA {
@@ -22,8 +22,9 @@ pub struct DFA {
     //input buffer
     //如果读取到行末却没有对应终结状态，就将buffer内打包为普通文本处理
     pub(super) buff: Vec<char>,
-    full_buff:Vec<char>,
-}
+    // line status
+    line_status:LineStatus
+}   
 
 impl DFA {
     pub(super) fn new() -> Self {
@@ -33,7 +34,7 @@ impl DFA {
             line_start: Status(1),
             final_status: HashMap::with_capacity(32),
             buff: Vec::with_capacity(16),
-            full_buff:Vec::with_capacity(512),
+            line_status:LineStatus::LineStart,
             any_trans: HashMap::with_capacity(32),
         }
     }
@@ -51,9 +52,9 @@ impl DFA {
                 .and_then(|c: char| self.any_trans.get(&status).and_then(|ca| ca.can_any(c)))
                 .and_then(|at| self.table.get(&(InputChar::Any(at), status))))
         {
+            self.line_status.update(&input);
             if let InputChar::Char(c) = input {
                 self.buff.push(c);
-                self.full_buff.push(c);
             }
             NextStatus::GoOn(*ns)
         }
@@ -71,10 +72,7 @@ impl DFA {
             let sta = 
             // 如果缓冲区为空，当前输入字符非换行就是非行首
             if self.buff.len()==0 {
-                if let InputChar::Char(c)=input{
-                    
-                    self.full_buff.push(c);
-                }
+                self.line_status.update(&input);
                 self.init_status
             }else{
                 self.reset_status()
@@ -89,28 +87,9 @@ impl DFA {
     }
 
     fn reset_status(&self) -> Status {
-        let mut idx = self.full_buff.len();
-        // check empty buff
-        if idx == 0 {
-            return self.line_start;
-        } else {
-            idx -= 1;
-        }
-
-        // 循环跳过空格到第一个不是空格的地方
-        while unsafe { self.full_buff.get_unchecked(idx) }.is_whitespace()
-            && unsafe { self.full_buff.get_unchecked(idx) } != &'\n'
-        {
-            if idx == 0 {
-                break;
-            }
-            idx -= 1;
-        }
-        // check last non empty char
-        if unsafe { self.full_buff.get_unchecked(idx) } == &'\n' || idx == 0 {
-            self.line_start
-        } else {
-            self.init_status.clone()
+        match self.line_status {
+            LineStatus::Normal => self.init_status,
+            LineStatus::LineStart => self.line_start,
         }
     }
 
@@ -125,49 +104,5 @@ impl DFA {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-
-    #[test]
-    fn test_reset_status() {
-        let mut dfa = DFA::new();
-        // read a Idented  still in the line start
-        dfa.buff.extend(['a', '\n', ' ', ' ', ' ', ' ']);
-        let res = dfa.reset_status();
-        dfa.buff.clear();
-        assert_eq!(res, dfa.line_start);
-
-        // read a Ident \t is line start
-        dfa.buff.extend(['a', '\n', '\t']);
-        let res = dfa.reset_status();
-        dfa.buff.clear();
-        assert_eq!(res, dfa.line_start);
-
-        // read 2 mixed ident is line start
-        dfa.buff.extend(['a', '\n', '\t', ' ', ' ', ' ', ' ']);
-        let res = dfa.reset_status();
-        dfa.buff.clear();
-        assert_eq!(res, dfa.line_start);
-
-        dfa.buff.extend(['a', '\n', ' ', ' ', ' ', ' ', '\t']);
-        let res = dfa.reset_status();
-        dfa.buff.clear();
-        assert_eq!(res, dfa.line_start);
-
-        // read title sign ,not a line start
-        dfa.buff.extend(['a', '\n', '#', ' ']);
-        let res = dfa.reset_status();
-        dfa.buff.clear();
-        assert_eq!(res, dfa.init_status);
-
-        // end with \n is line start
-        dfa.buff.extend(['a', ' ', ' ', '\n']);
-        let res = dfa.reset_status();
-        dfa.buff.clear();
-        assert_eq!(res, dfa.line_start);
-
-        // empty buff is line start
-        dfa.buff.clear();
-        let res = dfa.reset_status();
-        assert_eq!(res, dfa.line_start);
-    }
+    
 }

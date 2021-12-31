@@ -1,3 +1,5 @@
+use full_token_derive_macro::FullToken;
+
 use super::super::token_trait::{TokenTrait, FullToken};
 
 
@@ -9,14 +11,13 @@ impl TokenTrait for PartRef {
     }
 
     fn to_full(&self, buff: &[char]) -> Box<dyn FullToken> {
-        Box::new(Reference{depath:buff.len()})
+        Box::new(Reference{depath:buff.len() as u64})
     }
 }
 
+#[derive(FullToken)]
+#[token(name="refer")]
 pub struct Reference{
-    pub depath:usize
+    pub depath:u64
 }
 
-impl FullToken for Reference {
-    
-}

@@ -8,16 +8,14 @@ use self::{
         core::DFA,
         wraps::{InputChar, Status},
     },
-    tokens::{Eof, Plain}, token_trait::FullToken,
+    token_trait::FullToken,
+    tokens::{Eof, Plain},
 };
 
 mod dfa;
 mod nfa;
-pub mod tokens;
 pub mod token_trait;
-
-
-
+pub mod tokens;
 
 type RawData = Vec<char>;
 
@@ -52,6 +50,7 @@ impl<'s> LexicalLoader<'s> {
         let mut plain_buff = Vec::with_capacity(128);
         loop {
             let next_input = self.next_char();
+            // println!("now_status: {} input {:?}",status,next_input);
             // 状态机启动
             match self.dfa.next_status(status, next_input.clone()) {
                 // 中间状态，继续转换
@@ -62,7 +61,7 @@ impl<'s> LexicalLoader<'s> {
                         self.to_dfa = Some(next_input);
                         self.dfa.reset();
                         break Token(
-                            Box::new(Plain(String::from_iter(plain_buff.iter()))),
+                            Plain::new_box(&plain_buff),
                             plain_buff.into_iter().collect(),
                         );
                     } else {
@@ -79,6 +78,7 @@ impl<'s> LexicalLoader<'s> {
                 }
                 dfa::wraps::NextStatus::Plain(pl, s, i) => {
                     // 普通文本，没进buff就停机
+                    // println!("plain{:?} ,{},{}",&pl,&s,i);
                     if pl.len() == 0 {
                         if let InputChar::Char(c) = i {
                             plain_buff.push(c);
@@ -89,7 +89,7 @@ impl<'s> LexicalLoader<'s> {
                                 if plain_buff.len() == 0 {
                                     Box::new(Eof)
                                 } else {
-                                    Box::new(Plain(String::from_iter(plain_buff.iter())))
+                                    Plain::new_box(&plain_buff)
                                 },
                                 plain_buff.into_iter().collect(),
                             );
@@ -102,7 +102,7 @@ impl<'s> LexicalLoader<'s> {
                         self.to_dfa = None;
                     } else {
                         let token = Token(
-                            Box::new(Plain(String::from_iter(pl.iter()))),
+                            Plain::new_box(&plain_buff),
                             pl.into_iter().collect(),
                         );
                         self.status = s;
@@ -128,6 +128,8 @@ impl<'s> LexicalLoader<'s> {
 
 #[cfg(test)]
 mod test {
+    use crate::lexical::token_trait::FromTokenMeta;
+
     use super::*;
 
     #[test]
@@ -169,7 +171,7 @@ mod test {
 
     #[test]
     fn test_title_read() {
-        let input="## Md解析器 ***全新版本*** 好耶 [abab](http://www.bilibili b站) emm";
+        let input="## Md解析器 ***全新版本*** 好耶 [abab](http://www.bilibili b站) emm\n\n好家伙，这么顶  \n\n";
         let mut lex = LexicalLoader::new(input.chars());
 
         let Token(_t, r) = lex.next_token();
@@ -190,7 +192,13 @@ mod test {
 
         let Token(_t, r) = lex.next_token();
         println!("token raw: {:?}", r);
-        assert_eq!(r, "***");
+        assert_eq!(r, "*");
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "*");
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "*");
 
         let Token(_t, r) = lex.next_token();
         println!("token raw: {:?}", r);
@@ -198,7 +206,13 @@ mod test {
 
         let Token(_t, r) = lex.next_token();
         println!("token raw: {:?}", r);
-        assert_eq!(r, "***");
+        assert_eq!(r, "*");
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "*");
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "*");
 
         let Token(_t, r) = lex.next_token();
         println!("token raw: {:?}", r);
@@ -250,8 +264,172 @@ mod test {
 
         let Token(_t, r) = lex.next_token();
         println!("token raw: {:?}", r);
-        //eof 
+        assert_eq!(r, "\n");
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "\n");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "好家伙，这么顶");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "  \n");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "\n");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        //eof
         assert_eq!(r, "");
     }
 
+    #[test]
+    fn test_code_snip() {
+        let input = "`rust`and```rus`tc```for the ```mirai`rust````";
+        let mut lex = LexicalLoader::new(input.chars());
+
+        let Token(t, r) = lex.next_token();
+        println!("{:?} - {:?}", t.get_data("inner"), r);
+        assert_eq!(
+            "rust",
+            String::from_token_meta(&t.get_data("inner").unwrap()).unwrap()
+        );
+
+        let Token(t, r) = lex.next_token();
+        println!("{} - {:?}", t.name(), r);
+        assert_eq!("and", r);
+
+        let Token(t, r) = lex.next_token();
+        println!("{:?} - {:?}", t.get_data("inner"), r);
+        assert_eq!(
+            "rus`tc",
+            String::from_token_meta(&t.get_data("inner").unwrap()).unwrap()
+        );
+
+        let Token(t, r) = lex.next_token();
+        println!("{} - {:?}", t.name(), r);
+        assert_eq!("for", r);
+
+        let Token(t, r) = lex.next_token();
+        println!("{} - {:?}", t.name(), r);
+        assert_eq!(" ", r);
+
+        let Token(t, r) = lex.next_token();
+        println!("{} - {:?}", t.name(), r);
+        assert_eq!("the", r);
+
+        let Token(t, r) = lex.next_token();
+        println!("{} - {:?}", t.name(), r);
+        assert_eq!(" ", r);
+
+        let Token(t, r) = lex.next_token();
+        println!("{:?} - {:?}", t.get_data("inner"), r);
+        assert_eq!(
+            "mirai`rust",
+            String::from_token_meta(&t.get_data("inner").unwrap()).unwrap()
+        );
+
+        let Token(t, r) = lex.next_token();
+        println!("{} - {:?}", t.name(), r);
+        assert_eq!("`", r);
+    }
+
+    #[test]
+    fn test_list() {
+        let input = "* abbabb\n* bbcbxx\n    12222332. abbaab\n    >> emmc?\n        codeblock";
+        let mut lex = LexicalLoader::new(input.chars());
+
+        // 行首无序段落
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "*");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, " ");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "abbabb");
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "\n");
+
+        // 第二行 无序段落
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "*");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, " ");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "bbcbxx");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "\n");
+
+        // 缩进段落
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "    ");
+        // 有序列表
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "12222332.");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, " ");
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "abbaab");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "\n");
+
+        // 缩进段落
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "    ");
+
+        //引用 二级
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, ">>");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, " ");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "emmc?");
+
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "\n");
+
+        // 缩进段落
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "    ");
+
+        // 缩进段落
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "    ");
+        //二级缩进
+        let Token(_t, r) = lex.next_token();
+        println!("token raw: {:?}", r);
+        assert_eq!(r, "codeblock");
+    }
 }

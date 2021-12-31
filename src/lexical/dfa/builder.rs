@@ -1,3 +1,5 @@
+use std::ops::Not;
+
 use super::{
     super::tokens::{
         code_snippet::PartCodeSnippet,
@@ -150,13 +152,7 @@ impl DFABuilder {
                 h.set_accept_status(m1, UnorderList);
                 h.set_accept_status(m2, UnorderList);
                 // order list
-                h.add_can_any(
-                    next,
-                    AdHocCanAny::new(|c| match c.is_digit(10) {
-                        true => Some(AnyType::Digit),
-                        false => None,
-                    }),
-                );
+                h.add_can_any(next, AdHocCanAny::new(|c| AnyType::Digit.type_match(c)));
                 next = h.add_tran_with_auto_next(next, AnyType::Digit);
                 next = h.add_tran_with_auto_next(next, '.');
                 h.set_accept_status(next, OrderList);
@@ -171,7 +167,9 @@ impl DFABuilder {
                 h.set_accept_status(next, SepLine);
                 //star
                 next = h.add_tran_with_auto_next(0, '*');
+                h.set_accept_status(next, Star);
                 next = h.add_tran(1, '*', next);
+                next = h.add_tran_with_auto_next(next, '*');
                 h.set_accept_status(next, Star);
 
                 //specal type
@@ -180,6 +178,7 @@ impl DFABuilder {
                 h.set_accept_status(next, SepChar);
                 // // line change
                 next = h.add_tran_with_auto_next(0, '\n');
+                next = h.add_tran(1, '\n', next);
                 h.set_accept_status(next, ChangeLine);
                 // // parghe change
                 next = h.add_tran_with_auto_next(0, ' ');
@@ -218,24 +217,49 @@ impl DFABuilder {
                 // 简短代码块
                 // 空白内容
                 next = h.add_tran_with_auto_next(0, '`');
+                next = h.add_tran(1, '`', next);
                 let inner_start = next;
                 next = h.add_tran_with_auto_next(next, '`');
+                let inner_end = next;
                 // 空白代码接受位置
                 h.set_accept_status(next, PartCodeSnippet);
                 // 非空白部分
                 // 内部接受任何非'`'字符
-                h.add_can_any(inner_start, AdHocCanAny::new(|_buff| Some(AnyType::Any)));
-                next = h.add_tran_with_auto_next(inner_start, AnyType::Any);
-                h.add_can_any(next, AdHocCanAny::new(|_| Some(AnyType::Any)));
+                h.add_can_any(
+                    inner_start,
+                    AdHocCanAny::new(|buff| (!AnyType::Char('\n')).type_match(buff)),
+                );
+                next = h.add_tran_with_auto_next(inner_start, !AnyType::Char('\n'));
+                h.add_can_any(
+                    next,
+                    AdHocCanAny::new(|input| AnyType::Any.type_match(input)),
+                );
                 next = h.add_tran(next, AnyType::Any, next);
                 next = h.add_tran_with_auto_next(next, '`');
                 // 简短代码块接受位置
                 h.set_accept_status(next, PartCodeSnippet);
                 // 后续复杂代码块
-                next = h.add_tran_with_auto_next(next, '`');
-                h.add_can_any(next, AdHocCanAny::new(|_| Some(AnyType::Any)));
+                next = h.add_tran_with_auto_next(inner_end, '`');
+                h.add_can_any(
+                    next,
+                    AdHocCanAny::new(|input| AnyType::Any.type_match(input)),
+                );
                 next = h.add_tran(next, AnyType::Any, next);
+                let inner = next;
+
                 next = h.add_tran_with_auto_next(next, '`');
+                h.add_can_any(
+                    next,
+                    AdHocCanAny::new(|input| AnyType::Any.type_match(input)),
+                );
+                h.add_tran(next, AnyType::Any, inner);
+
+                next = h.add_tran_with_auto_next(next, '`');
+                h.add_can_any(
+                    next,
+                    AdHocCanAny::new(|input| AnyType::Any.type_match(input)),
+                );
+                h.add_tran(next, AnyType::Any, inner);
                 next = h.add_tran_with_auto_next(next, '`');
                 h.set_accept_status(next, PartCodeSnippet);
             })
@@ -246,15 +270,14 @@ impl DFABuilder {
 #[cfg(test)]
 mod test {
 
-    use crate::lexical::{dfa::{
-        wraps::{InputChar, NextStatus},
-    }, token_trait::{FullToken, TokenTrait}};
+    use full_token_derive_macro::FullToken;
+
+    use crate::lexical::token_trait::{FullToken, TokenTrait};
 
     use super::*;
 
-    #[derive(Debug, Clone)]
+    #[derive(FullToken, Debug, Clone)]
     struct Indented;
-    impl FullToken for Indented {}
 
     impl TokenTrait for Indented {
         fn name(&self) -> &'static str {
@@ -263,72 +286,6 @@ mod test {
 
         fn to_full(&self, _: &[char]) -> Box<dyn FullToken> {
             Box::new(self.clone())
-        }
-    }
-
-    #[test]
-    fn test_builder() {
-        let mut dfa = DFABuilder::new(0, 1)
-            .add_trans(|h| {
-                let i = ' ';
-                let mut next = h.add_tran_with_auto_next(1, i);
-                next = h.add_tran_with_auto_next(next, i);
-                next = h.add_tran_with_auto_next(next, i);
-                next = h.add_tran_with_auto_next(next, i);
-                next = h.add_tran(1, '\t', next);
-
-                h.set_accept_status(next, Indented)
-            })
-            .build();
-        let mut init = dfa.init();
-        let mut last = None;
-
-        println!("init {:?}", &init);
-
-        let mut iter = vec!['\t', ' ', ' ', ' ', 'a'].into_iter();
-        loop {
-            let input = if let Some(c) = last {
-                last = None;
-                c
-            } else if let Some(input) = iter.next() {
-                input
-            } else {
-                break;
-            };
-
-            println!(" input {:?}", &input);
-            match dfa.next_status(init, input.into()) {
-                NextStatus::GoOn(go) => {
-                    println!("next {:?}", &go);
-                    init = go;
-                }
-                NextStatus::Final(r, _, ns, i) => {
-                    assert_eq!(i, InputChar::Char(' '));
-                    assert_eq!(ns, Status(1));
-                    assert_eq!(init, Status(5));
-                    if let InputChar::Char(c) = i {
-                        last = Some(c);
-                    }
-                    println!("{:?}", ns);
-                    init = ns;
-                }
-                NextStatus::Plain(p, s, i) => {
-                    assert_eq!(input, 'a');
-
-                    assert_eq!(p, vec![' ', ' ', ' ']);
-                    assert_eq!(s, Status(0));
-                    assert_eq!(i, InputChar::Char('a'));
-                }
-            }
-        }
-
-        let end = dfa.input_end();
-        if let NextStatus::Plain(p, s, i) = end {
-            assert_eq!(p, vec![]);
-            assert_eq!(s, Status(0));
-            assert_eq!(i, InputChar::Eof);
-        } else {
-            unreachable!()
         }
     }
 

@@ -7,15 +7,15 @@ impl Display for super::core::DFA {
 
         writeln!(f, "TransForm Table")?;
         writeln!(f, "{:^20}|{:^20}|{:^20}", 'S', 'I', 'D')?;
-        writeln!(f, "{0:-^20}|{0:-^20}|{0:-^20}",'-' )?;
+        writeln!(f, "{0:-^20}|{0:-^20}|{0:-^20}", '-')?;
         for ((i, s), d) in &self.table {
             writeln!(f, "{:^20}|{:^20}|{:^20}", s, i, d)?;
         }
-        writeln!(f, "{0:-^20}|{0:-^20}|{0:-^20}",'-' )?;
+        writeln!(f, "{0:-^20}|{0:-^20}|{0:-^20}", '-')?;
         writeln!(f, "Accept Table")?;
         writeln!(f, "S")?;
         for (s, h) in &self.final_status {
-            writeln!(f, "{} -> {}", s,h.name())?;
+            writeln!(f, "{} -> {}", s, h.name())?;
         }
 
         writeln!(f, "Any Trans Table")?;
@@ -120,7 +120,10 @@ impl Display for super::wraps::AnyType {
             super::wraps::AnyType::Numer => write!(f, "Numer"),
             super::wraps::AnyType::Ascii => write!(f, "Ascii"),
             super::wraps::AnyType::Orther(i) => write!(f, "Orther({})", i),
-            super::wraps::AnyType::Conbin(l, r) => write!(f, "{} | {}", l, r),
+            super::wraps::AnyType::Or(l, r) => write!(f, "( {} | {} )", l, r),
+            super::wraps::AnyType::Char(c) => write!(f, "Char [{}]", c),
+            super::wraps::AnyType::And(l, r) => write!(f, "( {} & {} )", l, r),
+            super::wraps::AnyType::Not(s) => write!(f, "(Not {} )", s),
         }
     }
 }

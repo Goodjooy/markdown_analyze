@@ -1,11 +1,22 @@
-
 #[macro_export]
 macro_rules! token_generator {
     ($name:literal,$ty:ident) => {
         #[derive(Clone)]
         pub struct $ty;
 
+        impl FromToken for $ty {
+            fn token_name() -> &'static str { $name }
+            fn from_token(src: std::boxed::Box<(dyn FullToken)>) -> Option<Self> {
+                if src.name()==Self::token_name(){
+                    Some($ty)
+                }else{
+                    None
+                }
+            }
+        }
+
         impl FullToken for $ty{
+            fn name(&self) -> &'static str { $name }
         }
 
         impl TokenTrait for $ty{
@@ -26,11 +37,13 @@ macro_rules! token_generator {
 }
 
 pub mod code_snippet;
-pub mod titles;
 pub mod reference;
+pub mod titles;
 
+use crate::lexical::token_trait::FromToken;
 use crate::lexical::token_trait::TokenTrait;
 use crate::lexical::FullToken;
+use full_token_derive_macro::FullToken;
 pub use reference::PartRef as Reference;
 
 token_generator![
@@ -46,12 +59,16 @@ token_generator![
     "unorder_list": UnorderList, // -
     "order_list": OrderList,     // 0|1|2|3|4|5|6|7|8|9 .
     "SeperLine": SepLine,        // ---
-    "star": Star               // *
+    "star": Star,                // *
+    // 特殊token
+    "eof": Eof
 ];
 
-pub struct FullTrans(char);
+#[derive(FullToken)]
+pub struct FullTrans {
+    ch: char,
+}
 pub struct Trans;
-impl FullToken for FullTrans {}
 
 impl TokenTrait for Trans {
     fn name(&self) -> &'static str {
@@ -59,16 +76,24 @@ impl TokenTrait for Trans {
     }
 
     fn to_full(&self, buff: &[char]) -> Box<dyn FullToken> {
-        Box::new(FullTrans(buff[1]))
+        Box::new(FullTrans { ch: buff[1] })
     }
 }
 
-pub struct Plain(pub(super) String);
-impl FullToken for Plain {
-    
+#[derive(FullToken)]
+pub struct Plain {
+    pub(super) inner: String,
 }
 
-pub struct  Eof;
-impl FullToken for Eof {
-    
-} 
+impl Plain {
+    pub fn new(buff: &[char]) -> Self {
+        Self {
+            inner: buff.iter().collect(),
+        }
+    }
+    pub fn new_box(buff: &[char]) -> Box<dyn FullToken> {
+        Box::new(Self {
+            inner: buff.iter().collect(),
+        })
+    }
+}

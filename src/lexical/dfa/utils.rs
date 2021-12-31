@@ -1,5 +1,6 @@
 use super::{interface::CanAny, wraps::AnyType};
 
+#[derive(Clone)]
 pub struct AdHocCanAny<F: Fn(char) -> Option<AnyType>> {
     handle: F,
 }

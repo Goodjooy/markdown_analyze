@@ -1,0 +1,17 @@
+[package]
+name = "full_token_derive_macro"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+proc-macro=true
+
+[dependencies]
+syn="1.0"
+quote="1.0"
+darling = "0.13.1"
+proc-macro2 = "1.0.34"
+
+[dependencies.macro_utils]
+path="../../macro_utils"

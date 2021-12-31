@@ -17,3 +17,6 @@ features=[
 
 [dependencies.regex_macro]
 path="./regex_macro"
+
+[dependencies.full_token_derive_macro]
+path="./full_token_derive_macro"

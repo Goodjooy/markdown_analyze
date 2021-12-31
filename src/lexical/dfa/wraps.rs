@@ -1,4 +1,4 @@
-use std::ops::BitOr;
+use std::ops::{BitAnd, BitOr, Not};
 
 use super::super::token_trait::FullToken;
 
@@ -28,10 +28,49 @@ pub enum AnyType {
     Numer,
     // 是否为ASCII编码
     Ascii,
+    // char
+    Char(char),
     // 其他类型（要提供标记id）
     Orther(usize),
     // 混合
-    Conbin(Box<AnyType>, Box<AnyType>),
+    Or(Box<AnyType>, Box<AnyType>),
+    And(Box<AnyType>, Box<AnyType>),
+    Not(Box<AnyType>),
+}
+
+impl AnyType {
+    fn is_match(&self, input: char) -> bool {
+        match self {
+            AnyType::Any => true,
+            AnyType::Digit => input.is_digit(10),
+            AnyType::Alphabet => input.is_alphabetic(),
+            AnyType::LowerCase => input.is_lowercase(),
+            AnyType::UpperCase => input.is_uppercase(),
+            AnyType::WhiteSpace => input.is_whitespace(),
+            AnyType::Numer => input.is_numeric(),
+            AnyType::Ascii => input.is_ascii(),
+            AnyType::Char(c) => &input == c,
+            // orhter 需要手动实现类型匹配判断
+            AnyType::Orther(_) => false,
+            AnyType::Or(l, r) => l.is_match(input) || r.is_match(input),
+            AnyType::And(l, r) => l.is_match(input) && r.is_match(input),
+            AnyType::Not(s) => !s.is_match(input),
+        }
+    }
+
+    pub fn type_match(&self, input: char) -> Option<Self> {
+        if self.is_match(input) {
+            Some(self.clone())
+        } else {
+            None
+        }
+    }
+}
+
+impl From<char> for AnyType {
+    fn from(c: char) -> Self {
+        Self::Char(c)
+    }
 }
 
 impl Into<InputChar> for AnyType {
@@ -44,7 +83,23 @@ impl BitOr for AnyType {
     type Output = AnyType;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        AnyType::Conbin(Box::new(self), Box::new(rhs))
+        AnyType::Or(Box::new(self), Box::new(rhs))
+    }
+}
+
+impl BitAnd for AnyType {
+    type Output = AnyType;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        AnyType::And(Box::new(self), Box::new(rhs))
+    }
+}
+
+impl Not for AnyType {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        AnyType::Not(Box::new(self))
     }
 }
 
@@ -105,5 +160,45 @@ pub enum NextStatus {
     ),
 }
 
+#[derive(Debug,PartialEq, Eq)]
+pub (super)enum LineStatus {
+    Normal,
+    LineStart,
+}
 
+impl LineStatus  {
+    pub(super) fn update(&mut self,input:&InputChar){
+        if let InputChar::Char(c)=input{
+            if c==&'\n'{
+                *self=Self::LineStart
+            }else if !c.is_whitespace(){
+                *self=Self::Normal
+            }
+        }else if let InputChar::LineStart=input{
+            *self=LineStatus::LineStart
+        }else if let InputChar::Any(AnyType::Char('\n'))=input {
+            *self=LineStatus::LineStart
+        }
+    }
+}
 
+#[cfg(test)]
+mod test{
+    use super::LineStatus;
+
+    #[test]
+    fn test_line_status() {
+        let mut init=LineStatus::LineStart;
+        init.update(&'a'.into());
+        assert_eq!(init,LineStatus::Normal);
+        init.update(&'\n'.into());
+        assert_eq!(init,LineStatus::LineStart);
+        init.update(&' '.into());
+        assert_eq!(init,LineStatus::LineStart);
+        init.update(&'\t'.into());
+        assert_eq!(init,LineStatus::LineStart);
+
+        init.update(&'k'.into());
+        assert_eq!(init,LineStatus::Normal);
+    }
+}
